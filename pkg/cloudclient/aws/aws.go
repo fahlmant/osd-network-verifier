@@ -25,6 +25,14 @@ type Client struct {
 	output       output.Output
 }
 
+type NewAWSClientInput struct {
+	Ctx                  context.Context
+	Logger               ocmlog.Logger
+	Creds                interface{}
+	Region, InstanceType string
+	Tags                 map[string]string
+}
+
 // Extend EC2Client so that we can mock them all for testing
 // to re-generate mockfile once another interface is added for testing:
 // mockgen -source=pkg/cloudclient/aws/aws.go -package mocks -destination=pkg/cloudclient/mocks/mock_aws.go
@@ -51,32 +59,32 @@ func (c *Client) VerifyDns(ctx context.Context, vpcID string) *output.Output {
 }
 
 // NewClient creates a new CloudClient for use with AWS.
-func NewClient(ctx context.Context, logger ocmlog.Logger, creds interface{}, region, instanceType string, tags map[string]string) (client *Client, err error) {
-	switch c := creds.(type) {
+func NewClient(input *NewAWSClientInput) (client *Client, err error) {
+	switch c := input.Creds.(type) {
 	case awscredsv1.Credentials:
 		var value awscredsv1.Value
 		if value, err = c.Get(); err == nil {
 			client, err = newClient(
-				ctx,
-				logger,
+				input.Ctx,
+				input.Logger,
 				value.AccessKeyID,
 				value.SecretAccessKey,
 				value.SessionToken,
-				region,
-				instanceType,
-				tags,
+				input.Region,
+				input.InstanceType,
+				input.Tags,
 			)
 		}
 	case awscredsv2.StaticCredentialsProvider:
 		client, err = newClient(
-			ctx,
-			logger,
+			input.Ctx,
+			input.Logger,
 			c.Value.AccessKeyID,
 			c.Value.SecretAccessKey,
 			c.Value.SessionToken,
-			region,
-			instanceType,
-			tags,
+			input.Region,
+			input.InstanceType,
+			input.Tags,
 		)
 	default:
 		err = fmt.Errorf("unsupported credentials type %T", c)
